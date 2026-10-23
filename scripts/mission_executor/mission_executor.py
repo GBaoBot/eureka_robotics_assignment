@@ -5,7 +5,9 @@ camera recorder, and runs missions in a background thread. Data flows
 driver -> localization -> navigation; the executor only wires it. Front ends only use this small interface:
 
     with MissionExecutor.connect(ExecutorConfig(scene="01")) as executor:
-        executor.goals                      # [Goal(name, x, y, yaw)]
+        executor.goals                      # [Goal(name, x, y, yaw)] of the current scene
+        executor.scenes / executor.scene    # [Scene(id, name, difficulty)] / current scene id
+        executor.load_scene("02", seed=7)    # returns immediately, like start(); new map, goals, start pose
         executor.start(["kitchen", "sofa"])  # returns immediately; cancel() to stop
         executor.running / executor.error / executor.results
         executor.telemetry                  # mission state: path, status, reason, costmap, ...
@@ -53,6 +55,21 @@ class Goal(NamedTuple):
     yaw: Optional[float]  # None: any heading
 
 
+class Scene(NamedTuple):
+    id: str
+    name: str
+    difficulty: str  # "easy" / "advanced"
+
+
+# (scene id, seed) -> (mission for the new map, its goals); loads the scene and restarts localization.
+SceneLoader = Callable[[str, Optional[int]], tuple[NavigateToGoals, list[Goal]]]
+
+
+def _fetch_goals(rpc: RpcClient) -> list[Goal]:
+    return [Goal(g["name"], float(g["pose"][0]), float(g["pose"][1]),
+                 float(g["pose"][2]) if len(g["pose"]) > 2 else None) for g in rpc.get_goals()]
+
+
 @dataclass(frozen=True)
 class RecordingStatus:
     path: str
@@ -92,14 +109,18 @@ class ExecutorConfig:
 class MissionExecutor:
     def __init__(self, mission: NavigateToGoals, robot: RobotDriver, localization: Localization,
                  goals: list[Goal], recorder: Optional[RecordCamera] = None, scene: Optional[str] = None,
-                 on_close: Optional[Callable[[], None]] = None):
+                 on_close: Optional[Callable[[], None]] = None, scenes: Optional[list[Scene]] = None,
+                 scene_loader: Optional[SceneLoader] = None):
         """Ready-made parts; use connect() for the real system.
 
         robot: only state() is used (the raw pose). on_close: releases the parts (localization, drivers).
+        scene_loader: enables load_scene(); None = the scene can't be changed.
         """
         self.mission = mission
-        self.goals = goals
+        self.goals = goals  # replaced (not mutated) on a scene change: viewers can compare identity
         self.scene = scene
+        self.scenes = scenes or []
+        self._scene_loader = scene_loader
         self.results: dict[str, GoalResult] = {}  # of the last finished mission
         self.error: Optional[str] = None  # why the last mission aborted, None if it didn't
         self._robot = robot
@@ -124,8 +145,8 @@ class MissionExecutor:
             if scene is not None:
                 start = rpc.load_scene(scene, seed=config.seed)["start"]
                 log.info("loaded scene %s, start (%.2f, %.2f, %.2f)", scene, start["x"], start["y"], start["yaw"])
-            goals = [Goal(g["name"], float(g["pose"][0]), float(g["pose"][1]),
-                          float(g["pose"][2]) if len(g["pose"]) > 2 else None) for g in rpc.get_goals()]
+            goals = _fetch_goals(rpc)
+            scenes = [Scene(str(sc["id"]), sc.get("name", ""), sc.get("difficulty", "")) for sc in rpc.list_scenes()]
             state = driver.wait_for_state(timeout=5.0)  # the robot must be streaming before we drive it
             scene = scene or state.scene or None
             estimator = EkfLocalizer.from_robot_info(driver.robot_info) if config.localization else None
@@ -133,8 +154,8 @@ class MissionExecutor:
             # Entered after the driver, so the stack stops it before the driver closes.
             localization = stack.enter_context(Localization(
                 driver, estimator, Pose(start["x"], start["y"], start["yaw"]) if start else None))
-            navigate_to_goal = NavigateToGoal(rpc, driver, localization,
-                                              MissionLimits(goal_timeout=config.goal_timeout))
+            limits = MissionLimits(goal_timeout=config.goal_timeout)
+            navigate_to_goal = NavigateToGoal(rpc, driver, localization, limits)
         except (RpcError, TimeoutError) as e:
             stack.close()
             raise ConnectionError(f"simulator not reachable at {config.host}: {e}") from e
@@ -142,8 +163,16 @@ class MissionExecutor:
             stack.close()
             raise
         recorder = RecordCamera(camera, config.output_dir) if camera is not None else None
+
+        def load_scene(scene_id: str, seed: Optional[int]) -> tuple[NavigateToGoals, list[Goal]]:
+            start = rpc.load_scene(scene_id, seed=seed)["start"]  # the drivers stop the robot and drop old states
+            log.info("loaded scene %s, start (%.2f, %.2f, %.2f)", scene_id, start["x"], start["y"], start["yaw"])
+            localization.reset(Pose(start["x"], start["y"], start["yaw"]))  # exact start, before the robot moves
+            # A new NavigateToGoal fetches the new map: fresh costmap, planner state and goal cache.
+            return NavigateToGoals(NavigateToGoal(rpc, driver, localization, limits)), _fetch_goals(rpc)
+
         return cls(NavigateToGoals(navigate_to_goal), driver, localization, goals, recorder, scene,
-                   on_close=stack.close)
+                   on_close=stack.close, scenes=scenes, scene_loader=load_scene)
 
     # ----------------------------------------------------------------- lifecycle
 
@@ -181,6 +210,23 @@ class MissionExecutor:
         self.results, self.error = {}, None
         self._done.clear()
         threading.Thread(target=self._run, args=(list(goal_names), self._cancel), name="mission", daemon=True).start()
+        return True
+
+    def load_scene(self, scene_id: str, seed: Optional[int] = None) -> bool:
+        """Load another scene (new map, goals and start pose); False if busy or not supported.
+
+        Returns immediately; loading (about a second, plus building the costmap) runs in the
+        background thread, so `running` is True until it's done and `error` says if it failed.
+        """
+        if self.running:
+            log.warning("can't change the scene while a mission is running")
+            return False
+        if self._scene_loader is None:
+            log.error("this executor can't change the scene")
+            return False
+        self.error = None
+        self._done.clear()
+        threading.Thread(target=self._load_scene, args=(scene_id, seed), name="scene-load", daemon=True).start()
         return True
 
     def cancel(self) -> None:
@@ -240,6 +286,18 @@ class MissionExecutor:
             finally:
                 if self._recorder is not None:
                     self._recorder.stop()  # after the mission, so the recording covers the robot stopping
+        finally:
+            self._done.set()
+
+    def _load_scene(self, scene_id: str, seed: Optional[int]) -> None:
+        try:
+            mission, goals = self._scene_loader(scene_id, seed)
+            # Mission first: a viewer that sees the new goals then reads the new mission's telemetry.
+            self.mission, self.scene, self.results = mission, scene_id, {}
+            self.goals = goals
+        except Exception as e:  # RpcError, or a bug: keep the app alive and say what happened
+            log.exception("loading scene %s failed", scene_id)
+            self.error = f"loading scene {scene_id} failed: {e}"
         finally:
             self._done.set()
 

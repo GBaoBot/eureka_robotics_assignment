@@ -185,6 +185,18 @@ class MapView(QGraphicsView):
         self._trail_path = QPainterPath()
         self._trail_item.setPath(self._trail_path)
 
+    def clear_scene(self) -> None:
+        """Forget everything from the previous scene; the next costmap is fitted to the view."""
+        self.clear_trail()
+        self._raw.clear()
+        self._raw_item.setPath(QPainterPath())
+        self.set_path(None)
+        for item in self._collision_items:
+            self.scene().removeItem(item)
+        self._collision_items.clear()
+        self._robot.setVisible(False)
+        self._fitted = False
+
     # ----------------------------------------------------------------- interaction
 
     def fit_map(self) -> None:
