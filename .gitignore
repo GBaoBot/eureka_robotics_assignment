@@ -1,0 +1,19 @@
+# Camera recordings: large (hundreds of MB, single files over GitHub's 100 MB limit).
+# The recorder creates the folder; share an example recording separately.
+assets/videos/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# C++ example client build output (cmake -B build examples)
+build/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
