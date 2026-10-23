@@ -121,7 +121,6 @@ examples/             the simulator's example clients
 
 ## Use of AI assistants
 
-Claude Code (Anthropic) was used as a coding assistant: to discuss designs, write and refactor
-code, write test scripts against a fake simulator and the real simulator, analyse
-measurements (pose noise, EKF tuning) and draft this documentation. Design choices were made
+Claude Code (Anthropic) was used as a coding assistant: to discuss designs, support to write and refactor
+code, write test scripts against a fake simulator and the real simulator. Design choices were made
 and reviewed by the author.
