@@ -13,7 +13,7 @@ import logging
 import math
 import threading
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 import zmq
 
@@ -64,6 +64,7 @@ class RobotDriver:
         self._data_lock = threading.Lock()
         self._state_cv = threading.Condition(self._data_lock)
         self._state: Optional[RobotState] = None
+        self._state_listeners: list[Callable[[RobotState], None]] = []
         self._robot_info: Optional[dict] = None
         # Wheel command (rad/s) and when the caller last set it; None = not in velocity mode.
         self._wheel_cmd: Optional[tuple[float, float]] = None
@@ -214,6 +215,10 @@ class RobotDriver:
 
     # ----------------------------------------------------------------- state
 
+    def on_state(self, callback: Callable[[RobotState], None]) -> None:
+        """Called with every new state, in order, from the receiver thread: keep it short (e.g. enqueue)."""
+        self._state_listeners.append(callback)
+
     def state(self) -> Optional[RobotState]:
         """Latest robot state, or None if none received since start / last scene change."""
         with self._data_lock:
@@ -264,3 +269,8 @@ class RobotDriver:
         with self._state_cv:
             self._state = st
             self._state_cv.notify_all()
+        for cb in list(self._state_listeners):
+            try:
+                cb(st)
+            except Exception:  # a broken listener must not stop the state stream
+                log.exception("state listener %r failed", cb)

@@ -1,29 +1,48 @@
-"""Localization: turns raw robot states into pose estimates, in its own thread (like a ROS 2 node).
+"""Localization: turns measurements into pose estimates, in its own thread (like a ROS 2 node).
 
-    RobotDriver --RobotState (raw)--> Localization --LocalizedState--> navigation, GUI
+    any source --Measurement (raw)--> submit() -> Localization --LocalizedState--> navigation, GUI
 
-It takes each state the driver receives, in order, runs the estimator (EkfLocalizer, or
-PassThrough for the raw pose) and publishes the latest estimate. Consumers read it with
-latest() or wait_for(newer_than), like subscribing to a topic; nothing else feeds it.
-Commands don't go through here: they go to the driver.
+It knows nothing about where measurements come from: whoever owns the source calls submit()
+with each one, in order (MissionExecutor wires RobotDriver.on_state to it). The thread runs
+the estimator (EkfLocalizer, or PassThrough for the raw pose) on every measurement and
+publishes the latest estimate. Consumers read it with latest() or wait_for(newer_than),
+like subscribing to a topic. Commands don't go through here: they go to the driver.
 """
 from __future__ import annotations
 
 import dataclasses
 import logging
 import math
+import queue
 import threading
 import time
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
 from vacuum.common.data_types import Pose
-from vacuum.drivers.robot_driver import RobotDriver
-from vacuum.drivers.data_types import RobotState
 
 log = logging.getLogger(__name__)
 
-SCENE_RESTART = 0.5  # s: sim time going back by more than this means load_scene / reset
+SCENE_RESTART = 0.5  # s: sensor time going back by more than this means load_scene / reset
+
+
+class Measurement(Protocol):
+    """What Localization needs from each input, e.g. a RobotState.
+
+    Must be a dataclass: the output is a copy of it with the pose replaced by the estimate.
+    """
+    @property
+    def t(self) -> float: ...  # sensor time, s
+    @property
+    def seq(self) -> int: ...
+    @property
+    def pose(self) -> Pose: ...  # measured pose
+    @property
+    def left_ticks(self) -> int: ...
+    @property
+    def right_ticks(self) -> int: ...
+    @property
+    def received(self) -> float: ...  # local time.monotonic() at reception
 
 
 class Estimator(Protocol):
@@ -34,7 +53,7 @@ class Estimator(Protocol):
 
 
 class PassThrough:
-    """No filtering: the estimate is the simulator's pose."""
+    """No filtering: the estimate is the measured pose."""
     sigma = None
 
     def reset(self, pose: Optional[Pose] = None) -> None:
@@ -46,21 +65,20 @@ class PassThrough:
 
 @dataclass(frozen=True)
 class LocalizedState:
-    state: RobotState  # the state as received, with its pose replaced by the estimate
-    raw_pose: Pose  # the simulator's pose, for comparison
+    state: Measurement  # the measurement as submitted, with its pose replaced by the estimate
+    raw_pose: Pose  # the measured pose, for comparison
     sigma: Optional[tuple[float, float]]  # (position m, yaw rad) uncertainty; None without a filter
 
 
 class Localization:
-    def __init__(self, driver: RobotDriver, estimator: Optional[Estimator] = None,
-                 initial_pose: Optional[Pose] = None):
+    def __init__(self, estimator: Optional[Estimator] = None, initial_pose: Optional[Pose] = None):
         """estimator: None = PassThrough. initial_pose: a known start (e.g. load_scene's exact
         start pose); None = start from the first measurement."""
-        self.driver = driver
         self.estimator = estimator or PassThrough()
         self.estimator.reset(initial_pose)
         self._cv = threading.Condition()
         self._latest: Optional[LocalizedState] = None
+        self._inbox: queue.SimpleQueue[Measurement] = queue.SimpleQueue()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._loop, name="localization", daemon=True)
         self._thread.start()
@@ -74,7 +92,7 @@ class Localization:
         self.close()
 
     def close(self) -> None:
-        """Stop the thread. Call before closing the driver."""
+        """Stop the thread; measurements submitted after this are ignored."""
         self._stop.set()
         self._thread.join(timeout=1.0)
 
@@ -84,6 +102,12 @@ class Localization:
             self.estimator.reset(pose)
             self._latest = None
 
+    # ----------------------------------------------------------------- input
+
+    def submit(self, measurement: Measurement) -> None:
+        """Queue a measurement; returns at once, so it is safe to call from a driver's receive thread."""
+        self._inbox.put(measurement)
+
     # ----------------------------------------------------------------- output
 
     def latest(self) -> Optional[LocalizedState]:
@@ -91,7 +115,7 @@ class Localization:
             return self._latest
 
     def wait_for(self, timeout: float = 2.0, newer_than: int = -1) -> LocalizedState:
-        """Block until an estimate for a state with seq > newer_than is published."""
+        """Block until an estimate for a measurement with seq > newer_than is published."""
         deadline = time.monotonic() + timeout
         with self._cv:
             while self._latest is None or self._latest.state.seq <= newer_than:
@@ -102,29 +126,24 @@ class Localization:
             return self._latest
 
     def state_age(self) -> float:
-        """Seconds since the state behind the latest estimate arrived (inf if none): link health."""
+        """Seconds since the measurement behind the latest estimate arrived (inf if none): link health."""
         latest = self.latest()
         return math.inf if latest is None else time.monotonic() - latest.state.received
 
     # ----------------------------------------------------------------- thread
 
     def _loop(self) -> None:
-        seq = -1
         while not self._stop.is_set():
             try:
-                raw = self.driver.wait_for_state(timeout=0.2, newer_than=seq)
-            except TimeoutError:
-                current = self.driver.state()
-                if current is None or current.seq >= seq:
-                    continue
-                raw = current  # seq went back: the scene was reloaded
+                raw = self._inbox.get(timeout=0.2)
+            except queue.Empty:
+                continue
             try:
                 self._publish(raw)
-            except Exception:  # a bad state must not kill localization for the rest of the run
-                log.exception("localization step failed for state %d", raw.seq)
-            seq = raw.seq
+            except Exception:  # a bad measurement must not kill localization for the rest of the run
+                log.exception("localization step failed for measurement %s", getattr(raw, "seq", repr(raw)))
 
-    def _publish(self, raw: RobotState) -> None:
+    def _publish(self, raw: Measurement) -> None:
         with self._cv:
             last = self._latest
             if last is not None and raw.t < last.state.t - SCENE_RESTART:

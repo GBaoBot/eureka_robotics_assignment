@@ -136,7 +136,8 @@ class MissionExecutor:
             estimator = EkfLocalizer.from_robot_info(driver.robot_info) if config.localization else None
             # load_scene's start pose is exact; without it, start from the first measurement.
             # Entered after the driver, so the stack stops it before the driver closes.
-            localization = stack.enter_context(Localization(driver, estimator, start))
+            localization = stack.enter_context(Localization(estimator, start))
+            driver.on_state(localization.submit)  # driver -> localization; neither knows the other
             limits = MissionLimits(goal_timeout=config.goal_timeout)
 
             def build_navigate_to_goal() -> NavigateToGoal:

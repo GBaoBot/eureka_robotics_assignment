@@ -23,9 +23,11 @@ and visualises what it is doing. It talks to the simulator only over its ZeroMQ 
 - **Drivers** wrap the four sockets. `RobotDriver` resends the wheel command at 20 Hz (the
   simulator stops the wheels after 250 ms without one) and sends zeros if the mission stops
   updating it for 0.5 s. `RpcClient` recreates its REQ socket after a 5 s timeout ("lazy pirate").
-- **Localization** is its own stage, like a ROS 2 node: it takes every raw state from the
-  driver and publishes a filtered pose (`latest()` / `wait_for()`). Navigation reads poses
-  from it and sends commands to the driver.
+- **Localization** is its own stage, and depends only on `common`: it
+  takes measurements pushed to `submit()` (any object with pose, wheel ticks and timestamps)
+  and publishes a filtered pose (`latest()` / `wait_for()`). `MissionExecutor` wires
+  `RobotDriver.on_state` to it, so neither knows the other. Navigation reads poses from it
+  and sends commands to the driver.
 - **Mission** (`mission_behaviors/`): `NavigateToGoal` runs once per localized state
   (50 Hz), like a simplified Nav2 behaviour tree: update map → collision? back up →
   path valid? else replan → follow path → arrived? `mark_goal`. `NavigateToGoals` visits goals

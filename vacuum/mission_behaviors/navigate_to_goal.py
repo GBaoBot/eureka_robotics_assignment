@@ -3,11 +3,11 @@
 Runs the behaviours in mission_behaviors/ once per robot state message (50 Hz),
 like a simplified Nav2 NavigateToPose behaviour tree:
 
-    UpdateGlobalMap -> CheckCollision ? BackUp (then replan)
-                    -> IsPathValid    ? else ComputePathToPose
-                    -> FollowPath     -> ARRIVED: MarkGoal / MISSED: replan
+    GetRobotState -> UpdateGlobalMap -> CheckCollision ? BackUp (then replan)
+                                     -> IsPathValid    ? else ComputePathToPose
+                                     -> FollowPath     -> ARRIVED: MarkGoal / MISSED: replan
 
-Poses come from Localization (one tick per localized state); commands go to the driver.
+Poses come from Localization through GetRobotState (one tick per localized state); commands go to the driver.
 The planner and controller are passed in, so any Planner / Controller implementation works.
 The costmap lives as long as this object, so obstacles found while driving to one
 goal are still avoided on the way to the next (see NavigateToGoals).
@@ -30,6 +30,7 @@ from vacuum.mission_behaviors.check_collision import CheckCollision
 from vacuum.mission_behaviors.compute_path_to_pose import ComputePathToPose
 from vacuum.mission_behaviors.follow_path import FollowPath, FollowResult
 from vacuum.mission_behaviors.get_pose_from_goal import GetPoseFromGoal
+from vacuum.mission_behaviors.get_robot_state import GetRobotState
 from vacuum.mission_behaviors.is_path_valid import IsPathValid
 from vacuum.mission_behaviors.mark_goal import MarkGoal
 from vacuum.mission_behaviors.telemetry import Telemetry
@@ -73,6 +74,7 @@ class NavigateToGoal:
         self.planner.set_map(self.costmap)  # keeps a reference: bumper obstacles are seen on replan
         self.controller = controller
 
+        self.get_robot_state = GetRobotState(localization, self.limits.state_timeout, self.limits.link_timeout)
         self.get_pose_from_goal = GetPoseFromGoal(rpc)
         self.update_global_map = UpdateGlobalMap(self.costmap)
         self.check_collision = CheckCollision()
@@ -127,8 +129,9 @@ class NavigateToGoal:
             if time.monotonic() > deadline:
                 return self._fail(f"timed out after {lim.goal_timeout:.0f} s")
 
-            state = self._next_state(seq)
-            if state is None:
+            state = self.get_robot_state.run(newer_than=seq)
+            if state is None:  # stream stalled: don't drive on an old pose
+                self.robot.stop()
                 continue
             seq = state.seq
             last_cmd = self.back_up.last_cmd if backing_up else self.follow_path.last_cmd
@@ -200,16 +203,3 @@ class NavigateToGoal:
         self.telemetry.reason = reason
         return GoalResult.FAILED
 
-    def _next_state(self, seq: int):
-        """Next robot state with the localized pose, or None after state_timeout (robot stopped).
-
-        Raises ConnectionError on link_timeout.
-        """
-        try:
-            return self.localization.wait_for(timeout=self.limits.state_timeout, newer_than=seq).state
-        except TimeoutError:
-            self.robot.stop()
-            if self.localization.state_age() > self.limits.link_timeout:
-                raise ConnectionError(f"no robot state for {self.limits.link_timeout:.0f} s")
-            log.warning("robot state stream stalled, robot stopped")
-            return None
