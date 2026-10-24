@@ -1,14 +1,15 @@
 """MapView: top-down 2D view of the costmap, robot, trail, raw pose, goals, path and collisions.
 
-A pure renderer: it is given plain data (numpy costs, (x, y) tuples, poses) and never
-reads drivers or mission objects. Everything is drawn in world metres; the view flips
-y so +y is up and +x is right, as in the world frame. Scroll to zoom, drag to pan.
+refresh() reads goals, poses and telemetry from MissionExecutor and redraws only what
+changed; the set_*() methods below it draw plain data (numpy costs, (x, y) tuples, poses).
+Everything is drawn in world metres; the view flips y so +y is up and +x is right, as in
+the world frame. Scroll to zoom, drag to pan.
 """
 from __future__ import annotations
 
 import math
 from collections import deque
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING, Optional, Sequence
 
 import numpy as np
 from PyQt6.QtCore import Qt
@@ -17,6 +18,9 @@ from PyQt6.QtWidgets import (QGraphicsEllipseItem, QGraphicsItem, QGraphicsLineI
                              QGraphicsPixmapItem, QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsView)
 
 from drivers.data_types import Pose
+
+if TYPE_CHECKING:  # type hint only: the view depends on the executor's interface, not its imports
+    from mission_executor.mission_executor import MissionExecutor
 
 # Costmap colours (Nav2 cost convention, see navigation/costmap.py).
 FREE_COLOR = QColor(250, 250, 250)
@@ -49,8 +53,14 @@ def _pen(color: QColor, width: float = 2.0, style=Qt.PenStyle.SolidLine) -> QPen
 
 
 class MapView(QGraphicsView):
-    def __init__(self, robot_radius: float = 0.17, trail_length: int = 10000, parent=None):
+    def __init__(self, executor: MissionExecutor, robot_radius: float = 0.17, trail_length: int = 10000,
+                 parent=None):
         super().__init__(parent)
+        self._executor = executor
+        self._goals = None  # the executor's goal list we show; a new list object means a new scene
+        self._map_version = -1
+        self._shown_path = None
+        self._active_goal = None
         self.setScene(QGraphicsScene(self))
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
@@ -94,6 +104,34 @@ class MapView(QGraphicsView):
 
         self._goal_items: dict[str, QGraphicsEllipseItem] = {}
         self._collision_items: list[QGraphicsItem] = []
+
+    # ----------------------------------------------------------------- refresh
+
+    def refresh(self) -> None:
+        ex = self._executor
+        if ex.goals is not self._goals:  # first refresh, or a scene change finished
+            self._goals = ex.goals
+            self.clear_scene()
+            self.set_goals(ex.goals)
+            self._map_version, self._shown_path, self._active_goal = -1, None, None  # redraw from the new telemetry
+        state = ex.robot_state()
+        self.set_robot_pose(state.pose if state is not None else None)
+        raw = ex.raw_robot_state()
+        self.set_raw_pose(raw.pose if raw is not None else None)
+
+        t = ex.telemetry
+        # map_version is bumped after costmap.costs is replaced, so a new version means new costs.
+        if t.costmap is not None and t.map_version != self._map_version:
+            self._map_version = t.map_version
+            self.set_costmap(t.costmap.costs, t.costmap.resolution, t.costmap.origin)
+        path = t.path
+        if path is not self._shown_path:  # a replan always makes a new Path object
+            self._shown_path = path
+            self.set_path(None if path is None else [(p.x, p.y) for p in path.poses])
+        if t.goal_name != self._active_goal:
+            self._active_goal = t.goal_name
+            self.set_active_goal(t.goal_name)
+        self.set_collisions(t.collisions)
 
     # ----------------------------------------------------------------- data in
 

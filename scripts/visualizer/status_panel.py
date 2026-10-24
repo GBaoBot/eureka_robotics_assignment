@@ -1,12 +1,19 @@
-"""StatusPanel: what the robot is doing and why, as text. A pure renderer like MapView."""
+"""StatusPanel: what the robot is doing and why, as text.
+
+refresh() reads the pose, localization, telemetry and recording from MissionExecutor;
+the show_*() methods below it render plain values.
+"""
 from __future__ import annotations
 
 import math
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from PyQt6.QtWidgets import QFormLayout, QLabel, QWidget
 
 from drivers.data_types import Pose
+
+if TYPE_CHECKING:  # type hint only: the panel depends on the executor's interface, not its imports
+    from mission_executor.mission_executor import MissionExecutor
 
 STATUS_COLORS = {"succeeded": "#1a8f3c", "failed": "#d01e1e", "cancelled": "#b07800",
                  "backing up": "#d01e1e", "planning": "#b07800", "following": "#1e64dc"}
@@ -14,8 +21,9 @@ LINK_STALE = 0.5  # s without a robot state before the link is shown as stale
 
 
 class StatusPanel(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, executor: MissionExecutor, parent=None):
         super().__init__(parent)
+        self._executor = executor
         layout = QFormLayout(self)
         self._labels = {}
         for key in ("goal", "status", "reason", "pose", "localization", "command", "collisions", "link",
@@ -24,6 +32,15 @@ class StatusPanel(QWidget):
             label.setWordWrap(True)
             layout.addRow(f"{key.capitalize()}:", label)
             self._labels[key] = label
+
+    def refresh(self) -> None:
+        ex = self._executor
+        state = ex.robot_state()
+        self.show_robot(state.pose if state is not None else None, ex.state_age())
+        self.show_localization(ex.localization_sigma())
+        t = ex.telemetry
+        self.show_mission(t.goal_name, t.status, t.reason, t.cmd.v, t.cmd.w, len(t.collisions), t.results)
+        self.show_recording(ex.recording_status())
 
     def show_mission(self, goal: Optional[str], status: str, reason: str,
                      v: float, w: float, collisions: int, results: Sequence[tuple[str, str]]) -> None:
