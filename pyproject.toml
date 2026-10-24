@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vacuum"
+version = "0.1.0"
+description = "Control software for the simulated robot vacuum: navigation, localization, camera recording, Qt viewer"
+requires-python = ">=3.12"
+dependencies = ["numpy", "pyzmq", "pillow"]
+
+[project.optional-dependencies]
+gui = ["PyQt6"]  # the Docker image installs it from apt (python3-pyqt6)
+
+[project.scripts]
+vacuum-cli = "vacuum.cli.app:main"
+vacuum-viewer = "vacuum.visualizer.app:main"
+
+[tool.setuptools.packages.find]
+include = ["vacuum*"]

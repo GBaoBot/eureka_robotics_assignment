@@ -4,7 +4,7 @@ Drives the simulated robot vacuum to named goals, records its RGBD camera for of
 visualises what it is doing, using only the simulator's ZeroMQ API.
 
 - Path planning (cost-aware A\*) and path following (pure pursuit) on the occupancy map,
-  with replanning when the map turns out to be wrong.
+  with replanning when hitting obstacles.
 - EKF localization fusing wheel odometry with the simulator's noisy pose.
 - Lossless camera recording with per-frame timing and pose.
 - Qt visualiser and a command-line front end.
@@ -35,9 +35,9 @@ the display for WSL2 (WSLg); on other hosts, adjust `DISPLAY` and the X11 mount 
    docker compose exec core bash
    ```
 
-3. Run the visualiser:
+3. Run the visualiser from the repository root (`~/robot_ws`):
    ```bash
-   python3 scripts/visualizer/app.py --scene 01 --seed 42
+   python3 -m vacuum.visualizer.app --scene 01 --seed 42
    ```
    - Pick a scene and optional seed, then **Load scene**.
    - Select goals and press **Go to selected**, double-click one goal, or press **Go to all**.
@@ -47,10 +47,10 @@ the display for WSL2 (WSLg); on other hosts, adjust `DISPLAY` and the X11 mount 
 
    Or without a GUI:
    ```bash
-   python3 scripts/cli/app.py --list                       # goals of the loaded scene
-   python3 scripts/cli/app.py --scene 03 --seed 7 --all    # every goal, in order
-   python3 scripts/cli/app.py --scene 01 kitchen living    # chosen goals
-   python3 scripts/cli/app.py                              # choose goals interactively
+   python3 -m vacuum.cli.app --list                        # goals of the loaded scene
+   python3 -m vacuum.cli.app --scene 03 --seed 7 --all     # every goal, in order
+   python3 -m vacuum.cli.app --scene 01 kitchen living     # chosen goals
+   python3 -m vacuum.cli.app                               # choose goals interactively
    ```
    Exit code: 0 all goals reached, 1 a goal failed or the mission aborted, 2 simulator
    unreachable or no goals given, 130 interrupted.
@@ -92,7 +92,7 @@ To check a build end to end against the simulator, run every goal of each scene 
 the exit code and per-goal results:
 
 ```bash
-for s in 01 02 03 04 05 06; do python3 scripts/cli/app.py --scene $s --seed 7 --all --no-record; done
+for s in 01 02 03 04 05 06; do python3 -m vacuum.cli.app --scene $s --seed 7 --all --no-record; done
 ```
 
 Comparing runs with and without `--no-ekf` shows the effect of the localization filter.
@@ -100,7 +100,8 @@ Comparing runs with and without `--no-ekf` shows the effect of the localization 
 ## Project layout
 
 ```
-scripts/
+vacuum/               the Python package (run with python3 -m vacuum.<front end>.app)
+  common/             shared data types (Pose, OccupancyMap); no I/O, NumPy only
   drivers/            ZeroMQ clients: RPC, robot commands/state, camera
   localization/       EKF and the Localization stage (raw state -> pose)
   navigation/         costmap, A* planner, pure-pursuit controller
@@ -108,6 +109,7 @@ scripts/
   mission_executor/   MissionExecutor: the entry point front ends use
   visualizer/         Qt front end
   cli/                command-line front end
+pyproject.toml        package metadata; `pip install -e .` adds vacuum-cli / vacuum-viewer
 docs/design.md        design note
 docker/, docker-compose.yaml
 examples/             the simulator's example clients
