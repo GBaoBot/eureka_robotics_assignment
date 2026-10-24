@@ -58,12 +58,13 @@ path is shortened with line-of-sight checks that never bring it closer to obstac
 
 - **Unmapped obstacles are detected only on contact.** The camera is recorded but not used for navigation, so the robot may bump into the same object several times (scenes 04 and 05).
 - **Orchestration is centralised in `MissionExecutor`**, which makes the system harder to extend with new features.
-- **Replanning is triggered only by collisions.** This is sufficient for the static scenes in this assignment but not for dynamic obstacles, which would also require real-time obstacle mapping from the depth camera; this was out of scope.
+- **Replanning is triggered only by collisions.** This is sufficient for the static scenes in this assignment but not for dynamic obstacles, which would also require real-time obstacle mapping from the depth camera.
+- **Parameter values are fixed in the code**. Current version does not include any config files or allow user to configure robot navigation on GUI.
 - **No automated test suite in the repository.**
 
 ## 4. With more time
 
 1. **Depth-camera obstacle layer:** back-project depth with the intrinsics and `T_base_camera`, mark obstacles 0–9 cm above the floor in a local costmap and replan before contact. `UpdateObstacleOnCostmap` is the hook for it.
-2. **Mission design from the GUI:** convert the mission behaviours into nodes so missions can be composed as a graph or behaviour tree, replacing the all-in-one `MissionExecutor`.
+2. **Mission design from the GUI:** convert the mission behaviours into nodes so missions can be composed as a graph or behaviour tree, replacing the all-in-one `MissionExecutor`. The configuration of robot motion and navigation are also set on the GUI by users.
 3. **Automated tests and CI:** a fake simulator, unit tests for the EKF and localization, and end-to-end missions, run headless.
 4. **Tighter goal tolerances** (about 1 cm / 1°) now that the pose is accurate, and a controller that predicts collisions (DWB- or MPC-style) instead of pure pursuit.
