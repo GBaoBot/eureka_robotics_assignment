@@ -42,7 +42,7 @@ class Costmap2D:
         self.cost_scaling_factor = cost_scaling_factor
 
         self._static = occ_map.grid.astype(bool)
-        self._dynamic = np.zeros_like(self._static)  # obstacles added at runtime (local costmap, bumper)
+        self._dynamic = np.zeros_like(self._static)  # obstacles added at runtime (local costmap)
         self.costs = np.zeros(self._static.shape, dtype=np.uint8)
         self._update_costs()
 
@@ -58,23 +58,20 @@ class Costmap2D:
         y = self.origin[1] + (self.height - 1 - r + 0.5) * self.resolution
         return x, y
 
-    def in_bounds(self, r: int, c: int) -> bool:
+    def is_in_bounds(self, r: int, c: int) -> bool:
         return 0 <= r < self.height and 0 <= c < self.width
 
     # ----------------------------------------------------------------- queries
 
     def cost(self, r: int, c: int) -> int:
         """Cost of a cell; outside the map counts as lethal."""
-        if not self.in_bounds(r, c):
+        if not self.is_in_bounds(r, c):
             return LETHAL
         return int(self.costs[r, c])
 
     def cost_at(self, x: float, y: float) -> int:
+        """Cost of a cell at world coordinate (x, y)"""
         return self.cost(*self.world_to_cell(x, y))
-
-    def in_collision(self, x: float, y: float) -> bool:
-        """True if the robot centred at (x, y) would touch an obstacle."""
-        return self.cost_at(x, y) >= INSCRIBED
 
     def max_cost_on_segment(self, x0: float, y0: float, x1: float, y1: float) -> int:
         """Highest cell cost along a straight segment, sampled every half cell."""
@@ -86,6 +83,10 @@ class Costmap2D:
             if worst >= LETHAL:
                 break
         return worst
+
+    def is_in_collision(self, x: float, y: float) -> bool:
+        """True if the robot centred at (x, y) would touch an obstacle."""
+        return self.cost_at(x, y) >= INSCRIBED
 
     # ----------------------------------------------------------------- updates
 
@@ -102,7 +103,7 @@ class Costmap2D:
         k = int(math.ceil(radius / self.resolution))
         for dr in range(-k, k + 1):
             for dc in range(-k, k + 1):
-                if dr * dr + dc * dc <= k * k and self.in_bounds(r0 + dr, c0 + dc):
+                if dr * dr + dc * dc <= k * k and self.is_in_bounds(r0 + dr, c0 + dc):
                     self._dynamic[r0 + dr, c0 + dc] = True
         self._update_costs()
 

@@ -56,7 +56,7 @@ class Planner(ABC):
         for a, b in zip(poses, poses[1:]):
             if costmap.max_cost_on_segment(a.x, a.y, b.x, b.y) >= INSCRIBED:
                 return False
-        return len(poses) > 0 and not costmap.in_collision(poses[-1].x, poses[-1].y)
+        return len(poses) > 0 and not costmap.is_in_collision(poses[-1].x, poses[-1].y)
 
     # ----------------------------------------------------------------- helpers for implementations
 

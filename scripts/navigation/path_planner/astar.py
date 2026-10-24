@@ -92,18 +92,18 @@ class AStarPlanner(Planner):
                 nr, nc = r + dr, c + dc
                 if not (0 <= nr < h and 0 <= nc < w):
                     continue
-                n = nr * w + nc
-                cell_cost = costs[n]
-                if cell_cost >= INSCRIBED or n in closed:
+                neightbor_idx = nr * w + nc
+                neighbor_cell_cost = costs[neightbor_idx]
+                if neighbor_cell_cost >= INSCRIBED or neightbor_idx in closed:
                     continue
                 # No diagonal moves that cut a blocked corner.
                 if dr and dc and (costs[r * w + nc] >= INSCRIBED or costs[nr * w + c] >= INSCRIBED):
                     continue
-                g_new = g_here + step * (1.0 + weight * cell_cost)
-                if g_new < g_cost.get(n, math.inf):
-                    g_cost[n] = g_new
-                    parent[n] = idx
-                    heapq.heappush(open_heap, (g_new + heuristic(nr, nc), g_new, n))
+                g_new = g_here + step * (1.0 + weight * neighbor_cell_cost)
+                if g_new < g_cost.get(neightbor_idx, math.inf):
+                    g_cost[neightbor_idx] = g_new
+                    parent[neightbor_idx] = idx
+                    heapq.heappush(open_heap, (g_new + heuristic(nr, nc), g_new, neightbor_idx))
 
         raise PlanningError("goal unreachable on the current map")
 
@@ -131,7 +131,7 @@ class AStarPlanner(Planner):
                 continue
             for dr, dc, _ in NEIGHBOURS:
                 n = (r + dr, c + dc)
-                if n not in seen and cm.in_bounds(*n):
+                if n not in seen and cm.is_in_bounds(*n):
                     seen.add(n)
                     queue.append((n, d + 1))
         return None

@@ -1,11 +1,5 @@
 """EKF localisation: wheel odometry (predict) fused with the simulator's noisy pose (update).
 
-State [x, y, yaw] in the world frame. Measured on the simulator (see the design note):
-  - the reported pose has white noise, sigma ~1 cm in x/y and ~0.5 deg in yaw, moving or not;
-  - wheel ticks are clean over short distances (quantisation only) but the odometry drifts
-    slowly, mostly in yaw (a few degrees over a few metres and turns).
-So odometry gives a smooth short-term motion and the pose pins down the long-term drift.
-
 Pure math, no threads: call step() with every robot state, in order.
 """
 from __future__ import annotations
