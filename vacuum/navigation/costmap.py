@@ -24,7 +24,7 @@ class Costmap2D:
     def __init__(
         self,
         occ_map: OccupancyMap,
-        robot_radius: float = 0.13,
+        robot_radius: float = 0.15,
         footprint_padding: float = 0.0,
         inflation_radius: float = 0.45,
         cost_scaling_factor: float = 8.0,

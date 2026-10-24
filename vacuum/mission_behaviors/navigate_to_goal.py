@@ -3,7 +3,7 @@
 Runs the behaviours in mission_behaviors/ once per robot state message (50 Hz),
 like a simplified Nav2 NavigateToPose behaviour tree:
 
-    GetRobotState -> UpdateGlobalMap -> CheckCollision ? BackUp (then replan)
+    GetRobotState -> UpdateObstacleOnCostmap -> CheckCollision ? BackUp (then replan)
                                      -> IsPathValid    ? else ComputePathToPose
                                      -> FollowPath     -> ARRIVED: MarkGoal / MISSED: replan
 
@@ -34,7 +34,7 @@ from vacuum.mission_behaviors.get_robot_state import GetRobotState
 from vacuum.mission_behaviors.is_path_valid import IsPathValid
 from vacuum.mission_behaviors.mark_goal import MarkGoal
 from vacuum.mission_behaviors.telemetry import Telemetry
-from vacuum.mission_behaviors.update_global_map import UpdateGlobalMap
+from vacuum.mission_behaviors.update_obstacle_on_costmap import UpdateObstacleOnCostmap
 from vacuum.navigation.controller.controller import Controller
 from vacuum.navigation.costmap import Costmap2D
 from vacuum.navigation.path_planner.planner import Path, Planner
@@ -76,7 +76,7 @@ class NavigateToGoal:
 
         self.get_robot_state = GetRobotState(localization, self.limits.state_timeout, self.limits.link_timeout)
         self.get_pose_from_goal = GetPoseFromGoal(rpc)
-        self.update_global_map = UpdateGlobalMap(self.costmap)
+        self.update_obstacle_on_costmap = UpdateObstacleOnCostmap(self.costmap)
         self.check_collision = CheckCollision()
         self.back_up = BackUp(robot)
         self.is_path_valid = IsPathValid(self.planner, self.controller)
@@ -137,7 +137,7 @@ class NavigateToGoal:
             last_cmd = self.back_up.last_cmd if backing_up else self.follow_path.last_cmd
             t.cmd = last_cmd
 
-            map_changed = self.update_global_map.run(state, last_cmd)
+            map_changed = self.update_obstacle_on_costmap.run(state, last_cmd)
             if map_changed:
                 t.map_version += 1
 

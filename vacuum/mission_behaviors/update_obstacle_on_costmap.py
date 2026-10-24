@@ -1,4 +1,4 @@
-"""UpdateGlobalMap: add obstacles discovered at runtime to the global costmap.
+"""UpdateObstacleOnCostmap: add obstacles discovered at runtime to the costmap.
 
 Bumper: the robot only collides while translating (turning in place is always
 possible), so the contact is ahead of it when driving forward, behind when reversing.
@@ -16,7 +16,7 @@ from vacuum.drivers.data_types import RobotState
 log = logging.getLogger(__name__)
 
 
-class UpdateGlobalMap:
+class UpdateObstacleOnCostmap:
     def __init__(self, costmap: Costmap2D, robot_radius: float = 0.17, obstacle_radius: float = 0.04):
         self.costmap = costmap
         self.robot_radius = robot_radius
