@@ -69,6 +69,17 @@ docker/, docker-compose.yaml
 examples/             the simulator's example clients
 ```
 
+## Results
+
+Real simulator, seed 7, all goals per scene, 90 s per goal:
+
+| Scene | 01 | 02 | 03 | 04 | 05 | 06 |
+|---|---|---|---|---|---|---|
+| Goals reached | 4/4 | 4/4 | 5/5 | 3/3 | 4/5 | 6/6 |
+| Collisions | 1 | 0 | 1 | 3 | 4 | 0 |
+
+All collisions were with obstacles missing from the map.
+
 ## Reference
 This project refers to different sources for implementation:
 - `Nav2`: https://docs.nav2.org/rolling/

@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 
 
 class UpdateObstacleOnCostmap:
-    def __init__(self, costmap: Costmap2D, robot_radius: float = 0.17, obstacle_radius: float = 0.04):
+    def __init__(self, costmap: Costmap2D, robot_radius: float = 0.15, obstacle_radius: float = 0.08):
         self.costmap = costmap
         self.robot_radius = robot_radius
         self.obstacle_radius = obstacle_radius
