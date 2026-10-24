@@ -16,44 +16,30 @@ visualises what it is doing, using only the simulator's ZeroMQ API.
 - Docker with Compose, on Linux, macOS or Windows with WSL2.
 - The simulator image `ghcr.io/eurekarobotics/vacuum-sim:1.0.0`.
 
-Everything else runs in the `core` container (`docker/Dockerfile`). The compose file forwards
-the display for WSL2 (WSLg); on other hosts, adjust `DISPLAY` and the X11 mount in
-`docker-compose.yaml`.
-
 ## Build and run
 
-1. Start the simulator (only one simulator at a time; it uses ports 5555–5558 and 8080):
+1. Pull and Start the simulator:
    ```bash
-   docker compose up -d sim
+   # Pull the docker image (only run once)
+   docker pull ghcr.io/eurekarobotics/vacuum-sim:1.0.0
+
+   # Start simulator container
+   docker run --rm -p 5555-5558:5555-5558 -p 8080:8080 ghcr.io/eurekarobotics/vacuum-sim:1.0.0 --scene 01 --viewer
    ```
    Its debug viewer is at http://localhost:8080.
 
-2. Build and enter the application container (the repository is mounted at `~/robot_ws`):
+2. Build and run the application container (the repository is mounted at `~/robot_ws`):
    ```bash
    docker compose build core
-   docker compose up -d core
-   docker compose exec core bash
+   docker compose up -d sim core
+   docker compose exec core python3 -m vacuum.visualizer.app
    ```
 
-3. Run the visualiser from the repository root (`~/robot_ws`):
-   ```bash
-   python3 -m vacuum.visualizer.app --scene 01 --seed 42
-   ```
    - Pick a scene and optional seed, then **Load scene**.
    - Select goals and press **Go to selected**, double-click one goal, or press **Go to all**.
      **Stop** halts the robot.
    - Scroll to zoom, drag to pan, double-click to fit the map.
    - Closing the window or pressing Ctrl-C stops the robot and saves the recording.
-
-Options:
-
-| Option | Effect |
-|---|---|
-| `--scene ID`, `--seed N` | load a scene with a reproducible start pose (default: keep the loaded scene) |
-| `--no-ekf` | use the simulator's raw pose instead of the EKF |
-| `--no-record`, `--output DIR` | turn camera recording off, or change its folder (default `assets/videos`) |
-| `--goal-timeout S` | seconds allowed per goal (default 180) |
-| `--host H`, `-v` | simulator host (default `localhost`); debug logging |
 
 ## Camera recordings
 
@@ -65,22 +51,6 @@ Each mission writes `assets/videos/<time>_scene<id>_<goals>/` (ignored by git):
 | `depth.mkv` | depth, 16-bit millimetres, lossless (FFV1 `gray16le`); 0 = invalid |
 | `frames.csv` | one row per frame: `frame, seq, t` (simulation s), `received` (unix s), robot `x, y, yaw` |
 | `metadata.json` | camera intrinsics, `depth_scale`, `T_base_camera`, frame counts, file formats |
-
-Frame *i* of both videos is row *i* of `frames.csv`; use the CSV for timing. Reading depth in Python:
-
-```python
-import subprocess, numpy as np
-raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", "depth.mkv", "-f", "rawvideo",
-                      "-pix_fmt", "gray16le", "-"], capture_output=True, check=True).stdout
-depth_m = np.frombuffer(raw, "<u2").reshape(-1, 480, 640) * 0.001   # 0 = invalid
-```
-
-## Testing
-
-There is no automated test suite in the repository yet (see the design note's limitations).
-To check a build end to end against the simulator, load each scene with seed 7 in the
-visualiser, press **Go to all** and read the per-goal results in the mission panel and log.
-Comparing runs with and without `--no-ekf` shows the effect of the localization filter.
 
 ## Project layout
 
@@ -99,14 +69,13 @@ docker/, docker-compose.yaml
 examples/             the simulator's example clients
 ```
 
-## Libraries and tools
-
-- Python 3.12, NumPy, pyzmq, Pillow, PyQt6 (Qt 6), and ffmpeg (camera encoding), installed
-  in `docker/Dockerfile`.
-- Docker / Docker Compose, Ubuntu 24.04 base image.
+## Reference
+This project refers to different sources for implementation:
+- `Nav2`: https://docs.nav2.org/rolling/
+- `robot_localization`: https://github.com/cra-ros-pkg/robot_localization
+- `ZMQ The guide`: https://zguide.zeromq.org/
+- `Qt Widget`: https://doc.qt.io/qt-6/widgets-tutorial.html
 
 ## Use of AI assistants
 
-Claude Code (Anthropic) was used as a coding assistant: to discuss designs, support to write and refactor
-code, write test scripts against a fake simulator and the real simulator. Design choices were made
-and reviewed by the author.
+Claude Code (Anthropic) was used as a coding assistant: to discuss designs, support to write and refactor code, write test scripts against a fake simulator and the real simulator. Design choices were made and reviewed by the author.

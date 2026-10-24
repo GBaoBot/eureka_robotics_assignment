@@ -1,11 +1,4 @@
 services:
-  sim:
-    image: ghcr.io/eurekarobotics/vacuum-sim:1.0.0
-    command: ["--scene", "01", "--viewer"]
-    ports:
-      - "5555-5558:5555-5558"
-      - "8080:8080"
-
   core:
     build:
       context: .
@@ -25,12 +18,12 @@ services:
       - video
     environment:
       - DISPLAY=${DISPLAY:-:0}
-      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}
-      - XDG_RUNTIME_DIR=/mnt/wslg/runtime-dir
+      - XAUTHORITY=/home/bao/.Xauthority
+      - QT_QPA_PLATFORM=xcb
       - QT_X11_NO_MITSHM=1
     volumes:
       - .:/home/bao/robot_ws
       - /dev:/dev_host
       - /dev/shm:/dev/shm
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - /mnt/wslg:/mnt/wslg
+      - ${XAUTHORITY:-/dev/null}:/home/bao/.Xauthority:ro
