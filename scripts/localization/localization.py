@@ -17,8 +17,9 @@ import time
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
-from drivers.data_types import Pose, RobotState
+from common.data_types import Pose
 from drivers.robot_driver import RobotDriver
+from drivers.data_types import RobotState
 
 log = logging.getLogger(__name__)
 

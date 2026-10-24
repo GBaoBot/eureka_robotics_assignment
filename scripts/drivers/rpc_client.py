@@ -21,7 +21,7 @@ import numpy as np
 import zmq
 from PIL import Image
 
-from drivers.data_types import OccupancyMap
+from common.data_types import OccupancyMap
 
 log = logging.getLogger(__name__)
 

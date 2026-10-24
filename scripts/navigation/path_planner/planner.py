@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from navigation.costmap import INSCRIBED, Costmap2D
-from drivers.data_types import Pose
+from common.data_types import Pose
 
 
 class PlanningError(RuntimeError):

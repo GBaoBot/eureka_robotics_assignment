@@ -13,7 +13,7 @@ from __future__ import annotations
 import math
 
 from navigation.controller.controller import Controller, VelocityCmd
-from drivers.data_types import Pose
+from common.data_types import Pose
 
 FOLLOW, ALIGN, DONE = "follow", "align", "done"
 

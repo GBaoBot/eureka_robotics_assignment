@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Optional, Sequence
 
 from PyQt6.QtWidgets import QFormLayout, QLabel, QWidget
 
-from drivers.data_types import Pose
+from common.data_types import Pose
 
 if TYPE_CHECKING:  # type hint only: the panel depends on the executor's interface, not its imports
     from mission_executor.mission_executor import MissionExecutor

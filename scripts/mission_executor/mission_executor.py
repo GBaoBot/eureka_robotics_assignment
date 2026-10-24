@@ -32,8 +32,9 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, NamedTuple, Optional
 
 from drivers.camera_driver import CameraDriver
-from drivers.data_types import Pose, RobotState
+from common.data_types import Pose
 from drivers.robot_driver import RobotDriver
+from drivers.data_types import RobotState
 from drivers.rpc_client import RpcClient, RpcError
 from mission_behaviors.navigate_to_goal import GoalResult, MissionLimits, NavigateToGoal
 from mission_behaviors.navigate_to_goals import NavigateToGoals

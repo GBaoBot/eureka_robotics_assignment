@@ -10,7 +10,7 @@ from typing import Optional
 
 import numpy as np
 
-from drivers.data_types import Pose
+from common.data_types import Pose
 
 log = logging.getLogger(__name__)
 

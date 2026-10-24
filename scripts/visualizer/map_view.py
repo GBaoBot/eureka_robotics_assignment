@@ -17,7 +17,7 @@ from PyQt6.QtGui import QBrush, QColor, QImage, QPainter, QPainterPath, QPen, QP
 from PyQt6.QtWidgets import (QGraphicsEllipseItem, QGraphicsItem, QGraphicsLineItem, QGraphicsPathItem,
                              QGraphicsPixmapItem, QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsView)
 
-from drivers.data_types import Pose
+from common.data_types import Pose
 
 if TYPE_CHECKING:  # type hint only: the view depends on the executor's interface, not its imports
     from mission_executor.mission_executor import MissionExecutor

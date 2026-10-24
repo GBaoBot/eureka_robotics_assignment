@@ -14,8 +14,9 @@ from typing import Optional
 
 from navigation.controller.controller import Controller, VelocityCmd
 from navigation.path_planner.planner import Path
-from drivers.data_types import Pose, RobotState
+from common.data_types import Pose
 from drivers.robot_driver import RobotDriver
+from drivers.data_types import RobotState
 
 log = logging.getLogger(__name__)
 

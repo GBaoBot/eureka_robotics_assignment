@@ -12,7 +12,7 @@ import math
 
 import numpy as np
 
-from drivers.data_types import OccupancyMap
+from common.data_types import OccupancyMap
 
 FREE = 0
 MAX_NON_OBSTACLE = 252

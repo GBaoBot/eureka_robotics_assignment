@@ -13,7 +13,7 @@ from typing import Optional
 
 from navigation.costmap import INSCRIBED, MAX_NON_OBSTACLE
 from navigation.path_planner.planner import Path, Planner, PlanningError
-from drivers.data_types import Pose
+from common.data_types import Pose
 
 SQRT2 = math.sqrt(2.0)
 NEIGHBOURS = [(-1, 0, 1.0), (1, 0, 1.0), (0, -1, 1.0), (0, 1, 1.0),

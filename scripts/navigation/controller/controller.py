@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from navigation.path_planner.planner import Path
-from drivers.data_types import Pose
+from common.data_types import Pose
 
 
 @dataclass(frozen=True)
