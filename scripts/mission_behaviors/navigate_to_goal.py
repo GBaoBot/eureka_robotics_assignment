@@ -153,6 +153,7 @@ class NavigateToGoal:
                 backing_up = not self.back_up.run()
                 continue
 
+            # Invalid Path
             if not self.is_path_valid.run(self.path, state, map_changed):
                 if self.path is not None:  # IsPathValid only rejects an existing path for these two
                     replan_reason = "path blocked by a new obstacle" if map_changed else "robot off path"
@@ -172,6 +173,7 @@ class NavigateToGoal:
                 planning_failures = 0
                 self._set_status("following", replan_reason)
 
+            # Follow Path
             result = self.follow_path.run(self.path, state)
             if result is FollowResult.ARRIVED:
                 # Pose was checked against the 5 cm / 5 deg criteria, so this mark should count.
