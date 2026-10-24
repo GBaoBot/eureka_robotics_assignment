@@ -1,4 +1,4 @@
-"""MissionExecutor: the entry point to the robot system for any front end (CLI, Qt GUI, tests).
+"""MissionExecutor: the entry point to the robot system for any front end (Qt GUI, tests).
 
 It connects the drivers, loads the scene, starts localization, builds the mission and the
 camera recorder, and runs missions in a background thread. Data flows

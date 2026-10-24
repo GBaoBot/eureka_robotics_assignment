@@ -6,8 +6,8 @@ and visualises what it is doing. It talks to the simulator only over its ZeroMQ 
 ## 1. Architecture
 
 ```
- front ends     visualizer/app.py (Qt GUI)           cli/app.py (terminal)
-                          \                              /
+ front end      visualizer/app.py (Qt GUI)
+                          |
  entry point            MissionExecutor.connect(config)      composition root, mission thread
                           |
  mission        NavigateToGoals -> NavigateToGoal -> behaviours (FollowPath, BackUp, MarkGoal, ...)

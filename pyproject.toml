@@ -13,7 +13,6 @@ dependencies = ["numpy", "pyzmq", "pillow"]
 gui = ["PyQt6"]  # the Docker image installs it from apt (python3-pyqt6)
 
 [project.scripts]
-vacuum-cli = "vacuum.cli.app:main"
 vacuum-viewer = "vacuum.visualizer.app:main"
 
 [tool.setuptools.packages.find]

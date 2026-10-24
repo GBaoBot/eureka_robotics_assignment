@@ -7,7 +7,7 @@ visualises what it is doing, using only the simulator's ZeroMQ API.
   with replanning when hitting obstacles.
 - EKF localization fusing wheel odometry with the simulator's noisy pose.
 - Lossless camera recording with per-frame timing and pose.
-- Qt visualiser and a command-line front end.
+- Qt visualiser to load scenes, start missions and watch the robot.
 
 **Design note** (architecture, decisions, trade-offs, limitations, results): [docs/design.md](docs/design.md)
 
@@ -45,17 +45,7 @@ the display for WSL2 (WSLg); on other hosts, adjust `DISPLAY` and the X11 mount 
    - Scroll to zoom, drag to pan, double-click to fit the map.
    - Closing the window or pressing Ctrl-C stops the robot and saves the recording.
 
-   Or without a GUI:
-   ```bash
-   python3 -m vacuum.cli.app --list                        # goals of the loaded scene
-   python3 -m vacuum.cli.app --scene 03 --seed 7 --all     # every goal, in order
-   python3 -m vacuum.cli.app --scene 01 kitchen living     # chosen goals
-   python3 -m vacuum.cli.app                               # choose goals interactively
-   ```
-   Exit code: 0 all goals reached, 1 a goal failed or the mission aborted, 2 simulator
-   unreachable or no goals given, 130 interrupted.
-
-Options for both front ends:
+Options:
 
 | Option | Effect |
 |---|---|
@@ -88,13 +78,8 @@ depth_m = np.frombuffer(raw, "<u2").reshape(-1, 480, 640) * 0.001   # 0 = invali
 ## Testing
 
 There is no automated test suite in the repository yet (see the design note's limitations).
-To check a build end to end against the simulator, run every goal of each scene and look at
-the exit code and per-goal results:
-
-```bash
-for s in 01 02 03 04 05 06; do python3 -m vacuum.cli.app --scene $s --seed 7 --all --no-record; done
-```
-
+To check a build end to end against the simulator, load each scene with seed 7 in the
+visualiser, press **Go to all** and read the per-goal results in the mission panel and log.
 Comparing runs with and without `--no-ekf` shows the effect of the localization filter.
 
 ## Project layout
@@ -108,8 +93,7 @@ vacuum/               the Python package (run with python3 -m vacuum.<front end>
   mission_behaviors/  NavigateToGoal(s), behaviours, telemetry, camera recorder
   mission_executor/   MissionExecutor: the entry point front ends use
   visualizer/         Qt front end
-  cli/                command-line front end
-pyproject.toml        package metadata; `pip install -e .` adds vacuum-cli / vacuum-viewer
+pyproject.toml        package metadata; `pip install -e .` adds the vacuum-viewer command
 docs/design.md        design note
 docker/, docker-compose.yaml
 examples/             the simulator's example clients
